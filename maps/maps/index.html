@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Mappa</title>
+
+    <script src="jquery.js"></script>
+    <link rel="stylesheet" href="jqwidgets/styles/jqx.base.css" type="text/css" />
+    <script type="text/javascript" src="jqwidgets/jqxcore.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxdata.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxbuttons.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxscrollbar.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxmenu.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxcheckbox.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxlistbox.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxdropdownlist.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.sort.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.pager.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.selection.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.edit.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.columnsresize.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.grouping.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.pager.js"></script>
+    <script type="text/javascript" src="jqwidgets/jqxgrid.filter.js"></script>
+    <script type="text/javascript" src="jqwidgets/globalization/globalize.js"></script>
+
+    <script>
+
+    var map;
+    var pos;
+    var circle;
+    var layer;
+    var radius;
+
+
+    $(document).ready(function(){
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position){
+              pos = {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+              };
+
+              initMap();
+              BuildTable();
+            });
+        };
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 10,
+            center: pos, //new google.maps.LatLng(2.8,-187.3),
+            mapTypeId: 'roadmap'
+          });
+
+          var marker = new google.maps.Marker({
+               position: pos,
+               map: map
+             });
+
+          circle = new google.maps.Circle({
+               clickable:false,
+               strokeColor: '#FF0000',
+               strokeOpacity: 0.8,
+               strokeWeight: 2,
+               fillColor: '#FF0000',
+               fillOpacity: 0.35,
+               center: pos,
+               map: map,
+               radius: 10000,
+               editable: true,
+               draggable: true
+             });
+
+          // layer = new google.maps.FusionTablesLayer({
+          //   query: {
+          //     select: 'Geo',
+          //     from: '1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-',
+          //     where: 'ST_INTERSECTS(Geo, ' +
+          //               'CIRCLE(LATLNG('+ pos.lat +','+ pos.lng +' ), ' + circle.getRadius() + '))'
+          //   }
+
+          layer = new google.maps.FusionTablesLayer({
+            query: {
+              select: 'Geo',
+              from: '1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-',
+              where: ''
+            }
+
+          });
+
+          layer.setMap(map);
+
+          circle.addListener("center_changed", circleEdited);
+          circle.addListener("radius_changed", circleEdited);
+
+          google.maps.event.addListener(circle, "click", showInfo);
+
+            infoWindow =  new google.maps.InfoWindow({
+
+          });
+
+          function showInfo(){
+            infoWindow.setPosition(circle.getCenter());
+            infoWindow.setContent("Il il raggio è: " +  Math.ceil(circle.getRadius() / 1000)   + " km")
+            infoWindow.open(map);
+          }
+
+          function circleEdited(){
+
+            // layer.setOptions({
+            //                 query: {
+            //                   select: 'Geo',
+            //                   from:  '1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-',
+            //                   where: 'ST_INTERSECTS(Geo, ' +
+            //                       'CIRCLE(LATLNG'+ circle.getCenter().toString() +', ' + circle.getRadius() + '))'
+            //                 }
+            //               });
+
+                console.log(circle.getCenter().toString());
+
+                BuildTable ();
+                showInfo();
+          }
+
+          google.maps.event.addListener(layer, 'click', function(e) {
+                console.log(e.row['Tipo']);
+          });
+
+        }
+
+        //var url = "https://www.googleapis.com/fusiontables/v2/query?sql=SELECT ROWID, Tipo FROM 1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-&key=AIzaSyBunNLloiD9-X4mVtbSw38yBrOWGY-K6a0&typed=true";
+
+        function  BuildTable () {
+
+          var radius = Math.ceil(circle.getRadius())
+
+          console.log(radius);
+
+          var url = {
+            base: "https://www.googleapis.com/fusiontables/v2/query?sql=",
+            key: "AIzaSyBunNLloiD9-X4mVtbSw38yBrOWGY-K6a0",
+            table:"1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-",
+            query:"SELECT ROWID, Tipo, Indirizzo, CAP, Comune, Provincia, Telefono, Geo, Denominazione, visibile, Regione FROM ",
+            //where:" WHERE ST_INTERSECTS(Geo, CIRCLE(LATLNG(" + pos.lat + "," + pos.lng + "), " + radius + "))",
+            where:" WHERE ST_INTERSECTS(Geo, CIRCLE(LATLNG" + circle.getCenter().toString() +  ", " + radius + "))",
+            sort:""
+          };
+
+          $.ajax ({
+              url: url.base + url.query + url.table   + url.sort + '&key=' + url.key,
+              method: "GET"
+          })
+          .done (function (data){
+
+            var obj = [];
+
+            $.each(data.rows, function( index, value ) {
+
+                var tmp = {};
+                tmp.id = value[0];
+                tmp.tipo = value[1];
+                tmp.indirizzo = value[2];
+                tmp.CAP = value[3];
+                tmp.comune = value[4];
+                tmp.provincia = value[5];
+                tmp.telefono = value[6];
+                tmp.geo = value[7];
+                tmp.denominazione = value[8];
+                tmp.visibile = value[9];
+                tmp.regione = value[10];
+
+                obj.push(tmp);
+
+            });
+
+            var source =
+                        {
+                            datatype: "json",
+                            datafields: [
+                                {name: 'id', type: 'int'},
+                                {name: 'indirizzo', type: 'string' },
+                                {name: 'CAP', type: 'string' },
+                                {name: 'comune', type: 'string' },
+                                {name: 'provincia', type: 'string' },
+                                {name: 'telefono', type: 'string' },
+                                {name: 'tipo', type: 'string' },
+                                {name: 'denominazione', type: 'string' },
+                                {name: 'visibile', type: 'bool'},
+                                {name: 'regione', type: 'string' }
+                            ],
+                            localdata: obj
+                        };
+            var dataAdapter = new $.jqx.dataAdapter(source);
+
+            var linkrenderer = function (row, column, value) {
+                // if (value.indexOf('#') != -1) {
+                //     value = value.substring(0, value.indexOf('#'));
+                // }
+                var format = { target: '"_blank"' };
+                var html = $.jqx.dataFormat.formatlink("tel:" + value, format);
+                return html;
+            }
+
+            $("#datagrid").jqxGrid(
+                  {
+                      width: 1024,
+                      height: 400,
+                      source: dataAdapter,
+                      columnsresize: true,
+                      filterable: true,
+                      sortable: true,
+                      showfilterrow: true,
+                      pageable: true,
+                      editable: true,
+                      groupable: true,
+                      columns: [{text: 'id', datafield: 'id', filterable: false, editable: false },
+                                {text: 'tipo', datafield: 'tipo',  filtertype: 'checkedlist' },
+                                {text: 'denominazione', datafield: 'denominazione',  filtertype: 'checkedlist' },
+                                {text: 'indirizzo', datafield: 'indirizzo' },
+                                {text: 'CAP', datafield: 'CAP' },
+                                {text: 'comune', datafield: 'comune',  filtertype: 'checkedlist' },
+                                {text: 'provincia', datafield: 'provincia',  filtertype: 'checkedlist' },
+                                {text: 'telefono', datafield: 'telefono', cellsrenderer: linkrenderer, filterable: false },
+                                {text: 'regione', datafield: 'regione', filtertype: 'checkedlist' },
+                                {text: 'visibile', datafield: 'visibile', columntype: 'checkbox', filtertype: 'checkedlist' }
+                              ]
+                  });
+
+          });
+
+          var filters = [];
+
+           $("#datagrid").on("filter", function (event) {
+
+            filters = [];
+            var where = "";
+
+            var filterinfo = $("#datagrid").jqxGrid('getfilterinformation');
+
+            // console.log("filter: ", filterinfo[0].filter.getfilters());
+            // console.log("filterinfo: ", filterinfo);
+
+            if (filterinfo.length != 0 ){
+
+
+              //var filter = new Object;
+
+              $.each(filterinfo, function(index, value){
+                  var filter = {};
+                  filter.colonna = value.filtercolumn;
+                  filter.filtri = getAllValues(value.filter);
+                  filters.push(filter);
+              });
+
+              $.each(filters, function (index, value){
+                   where += toTitleCase(value.colonna) + ' IN (' + value.filtri.map (function (i){
+                     return "'" + i + "'";
+                   }) + ')';
+                   if (filters.length > 1 && filters.length != index + 1) {
+                     where += " AND "
+                   }
+              });
+
+            };
+
+            setNewLayer (where);
+
+           });
+
+           function toTitleCase(str)
+           {
+               return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+           }
+
+           function getAllValues(filter){
+
+              var values = []
+              $.each (filter.getfilters(), function(index, value){
+                values.push(value.value);
+              })
+
+              return values;
+           };
+
+          // layer.setOptions({
+          //                 query: {
+          //                   select: 'Geo',
+          //                   from:  '1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-',
+          //                   where: 'ST_INTERSECTS(Geo, ' +
+          //                       'CIRCLE(LATLNG'+ circle.getCenter().toString() +' , ' + Math.ceil(circle.getRadius()) + '))'
+          //                 }
+          //               });
+        }
+
+        function setNewLayer(where){
+
+          layer.setOptions({
+                          query: {
+                            select: 'Geo',
+                            from:  '1MA84O9GBm-II4dX_W5TZ3ZWx-uSoAU7b9LTJ--6-',
+                            where: where
+                          }
+                        });
+
+          layer.setMap(map);
+        };
+
+      });
+
+    </script>
+
+    <style>
+           #map {
+            height: 100%;
+            /*width: 100%;*/
+           }
+           html, body{
+             height: 100%;
+           }
+    </style>
+  </head>
+  <body>
+    <h3>My Google Maps Demo</h3>
+    <div id="datagrid"></div>
+    <div id="map"></div>
+    <script async defer
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAX33f_9i1EtwDtES0RWHt4K25jlFAKsNA">
+    </script>
+  </body>
+</html>
